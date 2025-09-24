@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <arpa/inet.h>
 
 
 //-------------------------------------- KeyExpansion() logic -------------------------------------
@@ -43,7 +44,7 @@ static const uint8_t sbox[256] = {
     ((uint32_t)sbox[(word) & 0xFF]) \
 )
 
-// 1. comments = respective pseudo-code
+// 1. comments = NIST pseudo-code
 uint8_t* aes128_key_expansion(uint8_t *key) {
     uint8_t *expanded_key = malloc(4 * (Nr + 1) * 4); // 4 * 11 = 44 words (32bits = 4 bytes)
     uint32_t *w = (uint32_t*)expanded_key;
@@ -81,16 +82,36 @@ uint8_t* aes128_key_expansion(uint8_t *key) {
         // 15. i <- i + 1
         i++;
     }
+
+    // We store each 32-bit word in **big-endian** order [w0, w1, w2, w3] in KeyExpansion()
+    // to match the AES specification, however most modern x86 machines store 32-bit words
+    // in **little-endian**, [w3, w2, w1, w0]. Thus we need to convert the endianness of each word
+    for (int j = 0; j < 4 * (Nr + 1); j++) {
+        w[j] = htonl(w[j]);
+    }
     
     return expanded_key;
 }
 
 
-// ----------------------------
+//-------------------------------------- Main Encryption Logic -------------------------------------
 
-uint8_t* aes128_encrypt(uint8_t *plaintext, uint8_t *key) {
 
-    uint8_t *expanded_key = aes128_key_expansion(key);
-    
-    return plaintext;
+
+
+#define ADDROUNDKEYS(state, roundkey)        \
+    do {                                     \
+        for (int i = 0; i < 16; i++)         \
+            state[i] ^= roundkey[i];         \
+    } while (0)
+
+// 1. comments = NIST pseudo-code
+void aes128_encrypt(uint8_t *state, uint8_t *key) {
+
+    // key expansion (not shown in NIST pseudo-code)
+    uint8_t *w = aes128_key_expansion(key);
+
+    // 2. state <- in (we'll just directly pass state, note that it'll be a 1D array instead of a matrix)
+    // 3. state <- AddRoundKey(state, w[0..3]) (w[0..3] = 1st round key = w[0] = w)
+    ADDROUNDKEYS(state, w);
 }

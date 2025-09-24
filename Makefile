@@ -4,8 +4,6 @@ CFLAGS = -Wall -Wextra -std=c99 -O2 -g
 TARGET = aes128
 SOURCES = aes128.c
 
-all: $(TARGET)
-
 $(TARGET): $(SOURCES)
 	$(CC) $(CFLAGS) $(SOURCES) -I. -o $(TARGET)
 
@@ -17,7 +15,7 @@ clean:
 
 help:
 	@echo "Available targets:"
-	@echo "  all        - Build the AES-128 program"
+	@echo "  _	     - Build the AES-128 program"
 	@echo "  run        - Build and run the AES-128 program"
 	@echo "  clean      - Remove build artifacts"
 	@echo "  help       - Show this help message"
