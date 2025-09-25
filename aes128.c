@@ -1,3 +1,4 @@
+#include "aes128.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -40,7 +41,7 @@ static const uint8_t sbox[256] = {
 #define SUBWORD(word) ( \
     ((uint32_t)sbox[((word) >> 24) & 0xFF] << 24) | \
     ((uint32_t)sbox[((word) >> 16) & 0xFF] << 16) | \
-    ((uint32_t)sbox[((word) >> 8) & 0xFF] << 8) | \
+    ((uint32_t)sbox[((word) >> 8) & 0xFF] << 8) |   \
     ((uint32_t)sbox[(word) & 0xFF]) \
 )
 
@@ -56,10 +57,10 @@ uint8_t* aes128_key_expansion(uint8_t *key) {
     // 3. while i <= Nk - 1 do (simplified to i < Nk)
     while (i < Nk) {
         // 4. w[i] <- [key[4*i], key[4*i+1], key[4*i+2], key[4*i+3]]
-        w[i] = ((uint32_t)key[4*i] << 24) |
-               ((uint32_t)key[4*i+1] << 16) |
-               ((uint32_t)key[4*i+2] << 8) |
-               ((uint32_t)key[4*i+3]);
+        w[i] = ((uint32_t)key[4*0+i] << 24) |
+               ((uint32_t)key[4*1+i] << 16) |
+               ((uint32_t)key[4*2+i] << 8) |
+               ((uint32_t)key[4*3+i]);
         // 5. i <- i + 1
         i++;
     // 6. end while
@@ -96,13 +97,45 @@ uint8_t* aes128_key_expansion(uint8_t *key) {
 
 //-------------------------------------- Main Encryption Logic -------------------------------------
 
+#define SUBBYTES(state)                     \
+    do {                                    \
+        for (int i = 0; i < 16; ++i)        \
+            state[i] = sbox[state[i]];      \
+    } while (0)
 
+// here 2nd and 4th row, due to endianness left shifts become right shifts, that's why they look reversed
+#define SHIFTROWS(state)                    \
+    do {                                    \
+        uint32_t *s = (uint32_t*)(state);   \
+        s[1] = (s[1] << 24) | (s[1] >> 8);  \
+        s[2] = (s[2] << 16) | (s[2] >> 16); \
+        s[3] = (s[3] << 8) | (s[3] >> 24);  \
+        state = (uint8_t*)s;                \
+    } while (0)
 
+#define GF_MUL2(x) (((x) << 1) ^ (((x) >> 7) * 0x1b))
+#define GF_MUL3(x) (GF_MUL2(x) ^ (x))
+#define MIXCOLUMNS(state)                   \
+    do {                                    \
+        uint8_t t[16];                      \
+        for (int c = 0; c < 4; c++) {       \
+            t[c]      = GF_MUL2(state[c]) ^ GF_MUL3(state[c+4]) ^ state[c+8] ^ state[c+12]; \
+            t[c+4]    = state[c] ^ GF_MUL2(state[c+4]) ^ GF_MUL3(state[c+8]) ^ state[c+12]; \
+            t[c+8]    = state[c] ^ state[c+4] ^ GF_MUL2(state[c+8]) ^ GF_MUL3(state[c+12]); \
+            t[c+12]   = GF_MUL3(state[c]) ^ state[c+4] ^ state[c+8] ^ GF_MUL2(state[c+12]); \
+        }                                   \
+        for (int i = 0; i < 16; i++)        \
+            state[i] = t[i];                \
+    } while (0)
 
-#define ADDROUNDKEYS(state, roundkey)        \
-    do {                                     \
-        for (int i = 0; i < 16; i++)         \
-            state[i] ^= roundkey[i];         \
+#define ADDROUNDKEYS(state, roundkey)       \
+    do {                                    \
+        for (int i = 0; i < 4; i++) {       \
+            state[4*0+i] ^= roundkey[4*i+0];\
+            state[4*1+i] ^= roundkey[4*i+1];\
+            state[4*2+i] ^= roundkey[4*i+2];\
+            state[4*3+i] ^= roundkey[4*i+3];\
+        }                                   \
     } while (0)
 
 // 1. comments = NIST pseudo-code
@@ -114,4 +147,30 @@ void aes128_encrypt(uint8_t *state, uint8_t *key) {
     // 2. state <- in (we'll just directly pass state, note that it'll be a 1D array instead of a matrix)
     // 3. state <- AddRoundKey(state, w[0..3]) (w[0..3] = 1st round key = w[0] = w)
     ADDROUNDKEYS(state, w);
+
+    // 4. for round from 1 to Nr - 1 do
+    for (int _ = 1; _ < Nr; _++) {
+        // 5. state <- SubBytes(state)
+        SUBBYTES(state);
+        // 6. state <- ShiftRows(state)
+        SHIFTROWS(state);
+        // 7. state <- MixColumns(state)
+        MIXCOLUMNS(state);
+        // 8. state <- AddRoundKey(state, w[4*round..4*round+3]) (w[4*round..4*round+3] = w[r])
+        w += 16;
+        ADDROUNDKEYS(state, w);
+
+    // 9. end for
+    }
+
+    // 10. state <- SubBytes(state)
+    SUBBYTES(state);
+    // 11. state <- ShiftRows(state)
+    SHIFTROWS(state);
+    // 12. state <- AddRoundKey(state, w[4*Nr..4*Nr+3]) (w[4*Nr..4*Nr+3] = w[r])
+    w += 16;
+    ADDROUNDKEYS(state, w);
+
+    // 13. return state (we'll just modify state in place)
+    // 14. end procedure
 }

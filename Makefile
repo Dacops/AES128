@@ -1,14 +1,15 @@
 CC = gcc
 CFLAGS = -Wall -Wextra -std=c99 -O2 -g
 
-TARGET = aes128
-SOURCES = aes128.c
+TARGET = main
+SOURCES = main.c aes128.c
 
 $(TARGET): $(SOURCES)
 	$(CC) $(CFLAGS) $(SOURCES) -I. -o $(TARGET)
 
 run: $(TARGET)
 	./$(TARGET)
+	rm -f $(TARGET)
 
 clean:
 	rm -f $(TARGET)
