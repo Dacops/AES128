@@ -1,30 +1,33 @@
+#include <time.h>
 #include <stdio.h>
-#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
 #include "aes128.h"
+#include "tests.h"
 
-int main(void) {
-    uint8_t input[16] = {
-        0x32, 0x88, 0x31, 0xe0,
-        0x43, 0x5a, 0x31, 0x37,
-        0xf6, 0x30, 0x98, 0x07,
-        0xa8, 0x8d, 0xa2, 0x34
-    };
+int main(int argc, char **argv) {
+    int repeats = (argc > 1) ? atoi(argv[1]) : 1;
+    double total_time = 0.0;
+    uint8_t tmp[16];
 
-    uint8_t key[16] = {
-        0x2b, 0x28, 0xab, 0x09,
-        0x7e, 0xae, 0xf7, 0xcf,
-        0x15, 0xd2, 0x15, 0x4f,
-        0x16, 0xa6, 0x88, 0x3c
-    };
+    for (int _ = 0; _ < repeats; _++) {
+        for (int i = 0; i < 5; i++) {
+            memcpy(tmp, input[i], 16);
 
-    aes128_encrypt(input, key);
+            // only time the actual encryption
+            clock_t start = clock();
+            aes128_encrypt(tmp, keys[i]);
+            clock_t end = clock();
 
-    printf("Encrypted AES:\n");
-    for (int i = 0; i < 16; ++i) {
-        printf("%02x ", input[i]);
-        if ((i + 1) % 4 == 0)
-            printf("\n");
+            total_time += (double)(end - start) / CLOCKS_PER_SEC;
+
+            // sanity check
+            if (memcmp(tmp, output[i], 16) != 0) exit(EXIT_FAILURE);
+        }
     }
+
+    printf("Total time for %d naive AES-128 encryptions: %.6f seconds\n", repeats*5, total_time);
+    printf("Average per 16B block encryption: %.2f microseconds\n", total_time / (5 * repeats) * 1e6);
 
     return 0;
 }
