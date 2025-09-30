@@ -1,9 +1,4 @@
 #include "aes128.h"
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdint.h>
-#include <arpa/inet.h>
-
 
 //-------------------------------------- KeyExpansion() logic -------------------------------------
 
@@ -41,7 +36,7 @@ static const uint8_t sbox[256] = {
 #define SUBWORD(word) ( \
     ((uint32_t)sbox[((word) >> 24) & 0xFF] << 24) | \
     ((uint32_t)sbox[((word) >> 16) & 0xFF] << 16) | \
-    ((uint32_t)sbox[((word) >> 8) & 0xFF] << 8) |   \
+    ((uint32_t)sbox[((word) >>  8) & 0xFF] <<  8) | \
     ((uint32_t)sbox[(word) & 0xFF]) \
 )
 
@@ -59,7 +54,7 @@ uint8_t* aes128_key_expansion(uint8_t *key) {
         // 4. w[i] <- [key[4*i], key[4*i+1], key[4*i+2], key[4*i+3]]
         w[i] = ((uint32_t)key[4*0+i] << 24) |
                ((uint32_t)key[4*1+i] << 16) |
-               ((uint32_t)key[4*2+i] << 8) |
+               ((uint32_t)key[4*2+i] <<  8) |
                ((uint32_t)key[4*3+i]);
         // 5. i <- i + 1
         i++;
@@ -107,9 +102,9 @@ uint8_t* aes128_key_expansion(uint8_t *key) {
 #define SHIFTROWS(state)                    \
     do {                                    \
         uint32_t *s = (uint32_t*)(state);   \
-        s[1] = (s[1] << 24) | (s[1] >> 8);  \
+        s[1] = (s[1] << 24) | (s[1] >>  8); \
         s[2] = (s[2] << 16) | (s[2] >> 16); \
-        s[3] = (s[3] << 8) | (s[3] >> 24);  \
+        s[3] = (s[3] <<  8) | (s[3] >> 24); \
         state = (uint8_t*)s;                \
     } while (0)
 
@@ -159,7 +154,6 @@ void aes128_encrypt(uint8_t *state, uint8_t *key) {
         // 8. state <- AddRoundKey(state, w[4*round..4*round+3]) (w[4*round..4*round+3] = w[r])
         w += 16;
         ADDROUNDKEYS(state, w);
-
     // 9. end for
     }
 
