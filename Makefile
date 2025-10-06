@@ -1,13 +1,13 @@
 CC = gcc
-CFLAGS = -Wall -Wextra -std=c99 -O2 -g
+CFLAGS = -Wall -Wextra -std=c99 -O2 -g -maes -msse4.1
 
 TARGET = main
-SOURCES = main.c aes128.c ttables.c
+SOURCES = main.c aes128.c ttables.c aesni.c
 
 RUNS ?= 1
 
 $(TARGET): $(SOURCES)
-	$(CC) $(CFLAGS) $(SOURCES) -I. -o $(TARGET)
+	$(CC) $(CFLAGS) $(SOURCES) -I. -o $(TARGET) 
 
 run: $(TARGET)
 	./$(TARGET) $(RUNS)

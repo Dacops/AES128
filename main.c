@@ -4,6 +4,7 @@
 #include <string.h>
 #include "aes128.h"
 #include "ttables.h"
+#include "aesni.h"
 #include "tests.h"
 
 int main(int argc, char **argv) {
@@ -58,6 +59,35 @@ int main(int argc, char **argv) {
     }
 
     printf("Total time for %d T-Tables AES-128 encryptions: %.6f seconds\n", repeats*5, total_time);
+    printf("Average per 16B block encryption: %.2f microseconds\n", total_time / (5 * repeats) * 1e6);
+
+
+    // AES-128 with AES-NI
+    total_time = 0.0;
+    uint8_t tmp_key[16], tmp_input[16], tmp_output[16];
+    for (int _ = 0; _ < repeats; _++) {
+        for (int i = 0; i < 5; i++) {
+            // AES-NI expects column-major order, not row-major like in the matrix representation
+            memcpy(tmp_key, keys[i], 16);
+            memcpy(tmp_input, input[i], 16);
+            memcpy(tmp_output, output[i], 16);
+            matrix_to_linear(tmp_key);
+            matrix_to_linear(tmp_input);
+            matrix_to_linear(tmp_output);
+            memcpy(tmp, tmp_input, 16);
+
+            // only time the actual encryption
+            clock_t start = clock();
+            aesni_encrypt(tmp, tmp_key);
+            clock_t end = clock();
+
+            total_time += (double)(end - start) / CLOCKS_PER_SEC;
+
+            // sanity check
+            if (memcmp(tmp, tmp_output, 16) != 0) exit(EXIT_FAILURE);
+        }
+    }
+    printf("Total time for %d AES-NI AES-128 encryptions: %.6f seconds\n", repeats*5, total_time);
     printf("Average per 16B block encryption: %.2f microseconds\n", total_time / (5 * repeats) * 1e6);
 
     return 0;
