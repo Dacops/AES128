@@ -5,7 +5,20 @@
 #include "aes128.h"
 #include "ttables.h"
 #include "aesni.h"
+#include "openssl.h"
 #include "tests.h"
+
+void print_aes_matrix(uint8_t *state, const char *label) {
+    printf("%s:\n", label);
+    for (int row = 0; row < 4; row++) {
+        for (int col = 0; col < 4; col++) {
+            printf("%02X ", state[col*4 + row]); // column-major
+        }
+        printf("\n");
+    }
+    printf("\n");
+}
+
 
 int main(int argc, char **argv) {
     int repeats = (argc > 1) ? atoi(argv[1]) : 1;
@@ -67,7 +80,7 @@ int main(int argc, char **argv) {
     uint8_t tmp_key[16], tmp_input[16], tmp_output[16];
     for (int _ = 0; _ < repeats; _++) {
         for (int i = 0; i < 5; i++) {
-            // AES-NI expects column-major order, not row-major like in the matrix representation
+            // AES-NI expects column-major order, not row-major like in the NIST matrix representation
             memcpy(tmp_key, keys[i], 16);
             memcpy(tmp_input, input[i], 16);
             memcpy(tmp_output, output[i], 16);
@@ -89,6 +102,61 @@ int main(int argc, char **argv) {
     }
     printf("Total time for %d AES-NI AES-128 encryptions: %.6f seconds\n", repeats*5, total_time);
     printf("Average per 16B block encryption: %.2f microseconds\n", total_time / (5 * repeats) * 1e6);
+
+
+    // AES-128 with OpenSSL (deprecated AES interface)
+    total_time = 0.0;
+    for (int _ = 0; _ < repeats; _++) {
+        for (int i = 0; i < 5; i++) {
+            // OpenSSL implementation expects column-major order, not row-major like in the NIST matrix representation
+            memcpy(tmp_key, keys[i], 16);
+            memcpy(tmp_input, input[i], 16);
+            memcpy(tmp_output, output[i], 16);
+            matrix_to_linear(tmp_key);
+            matrix_to_linear(tmp_input);
+            matrix_to_linear(tmp_output);
+            memcpy(tmp, tmp_input, 16);
+
+            clock_t start = clock();
+            openssl_aes128_aes(tmp, tmp_key);
+            clock_t end = clock();
+
+            total_time += (double)(end - start) / CLOCKS_PER_SEC;
+
+            // sanity check
+            if (memcmp(tmp, tmp_output, 16) != 0) exit(EXIT_FAILURE);
+        }
+    }
+    printf("Total time for %d OpenSSL AES-128 (deprecated AES interface) encryptions: %.6f seconds\n", repeats*5, total_time);
+    printf("Average per 16B block encryption: %.2f microseconds\n", total_time / (5 * repeats) * 1e6);
+
+
+    // AES-128 with OpenSSL (new EVP interface)
+    total_time = 0.0;
+    for (int _ = 0; _ < repeats; _++) {
+        for (int i = 0; i < 5; i++) {
+            // OpenSSL implementation expects column-major order, not row-major like in the NIST matrix representation
+            memcpy(tmp_key, keys[i], 16);
+            memcpy(tmp_input, input[i], 16);
+            memcpy(tmp_output, output[i], 16);
+            matrix_to_linear(tmp_key);
+            matrix_to_linear(tmp_input);
+            matrix_to_linear(tmp_output);
+            memcpy(tmp, tmp_input, 16);
+
+            clock_t start = clock();
+            openssl_aes128_evp(tmp, tmp_key);
+            clock_t end = clock();
+
+            total_time += (double)(end - start) / CLOCKS_PER_SEC;
+
+            // sanity check
+            if (memcmp(tmp, tmp_output, 16) != 0) exit(EXIT_FAILURE);
+        }
+    }
+    printf("Total time for %d OpenSSL AES-128 (new EVP interface) encryptions: %.6f seconds\n", repeats*5, total_time);
+    printf("Average per 16B block encryption: %.2f microseconds\n", total_time / (5 * repeats) * 1e6);
+
 
     return 0;
 }

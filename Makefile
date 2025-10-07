@@ -1,10 +1,11 @@
 CC = gcc
 
-CFLAGS_RAW = -Wall -Wextra -std=c99 -O0 -g -maes -msse4.1
-CFLAGS_IMP = -Wall -Wextra -std=c99 -O3 -march=native -flto -g -maes -msse4.1
+# -Wno-deprecated-declarations since OpenSSL AES functions are deprecated
+CFLAGS_RAW = -Wall -Wextra -std=c99 -O0 -g -maes -msse4.1 -Wno-deprecated-declarations
+CFLAGS_IMP = -Wall -Wextra -std=c99 -O3 -march=native -flto -g -maes -msse4.1 -Wno-deprecated-declarations
 
 TARGET = main
-SOURCES = main.c aes128.c ttables.c aesni.c
+SOURCES = main.c aes128.c ttables.c aesni.c openssl.c
 
 RUNS ?= 1
 BUILD ?= improved
@@ -16,8 +17,10 @@ else
     CFLAGS = $(CFLAGS_IMP)
 endif
 
+LDFLAGS = -lcrypto
+
 $(TARGET): $(SOURCES)
-	$(CC) $(CFLAGS) $(SOURCES) -I. -o $(TARGET)
+	$(CC) $(CFLAGS) $(SOURCES) -I. -o $(TARGET) $(LDFLAGS)
 
 run: $(TARGET)
 	./$(TARGET) $(RUNS)
